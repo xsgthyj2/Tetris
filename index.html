@@ -2,23 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Neon Tetris Mobile</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Mobile Tetris</title>
 
 <style>
     body {
         margin: 0;
-        background: #050816;
+        background: #0a0f1f;
         font-family: Arial, sans-serif;
         display: flex;
         justify-content: center;
         padding: 10px;
         color: white;
+        overflow: hidden;
     }
 
-    .game-wrapper {
+    .game {
         width: 100%;
-        max-width: 420px;
+        max-width: 380px;
         text-align: center;
     }
 
@@ -26,32 +27,29 @@
         width: 100%;
         height: auto;
         background: #11172f;
-        border-radius: 10px;
-        box-shadow: 0 0 20px #00f5ff88;
+        border-radius: 12px;
+        box-shadow: 0 0 20px #00eaff88;
         touch-action: none;
     }
 
-    #next {
-        width: 120px;
-        height: 120px;
-        background: #11172f;
-        margin: 10px auto;
-        border-radius: 10px;
-    }
-
-    .overlay {
+    #overlay {
         position: absolute;
         top: 40%;
         left: 50%;
         transform: translate(-50%, -50%);
         background: rgba(0,0,0,0.7);
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-size: 18px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        font-size: 20px;
         display: none;
     }
 
-    .touch-controls {
+    .stats {
+        margin-top: 10px;
+        font-size: 20px;
+    }
+
+    .controls {
         margin-top: 15px;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -59,70 +57,60 @@
     }
 
     .btn {
-        padding: 14px 0;
+        padding: 16px 0;
         background: rgba(255,255,255,0.1);
         border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 10px;
-        font-size: 20px;
+        border-radius: 12px;
+        font-size: 22px;
         user-select: none;
     }
 
-    .stats {
-        margin-top: 10px;
-        font-size: 18px;
+    .btn:active {
+        background: rgba(255,255,255,0.25);
     }
 </style>
 </head>
 
 <body>
 
-<div class="game-wrapper">
-    <canvas id="board" width="240" height="480"></canvas>
-    <div id="overlay" class="overlay">Tap to Start</div>
+<div class="game">
+    <canvas id="board" width="200" height="400"></canvas>
+    <div id="overlay">Tap to Start</div>
 
     <div class="stats">
-        Score: <span id="score">0</span> |
-        Lines: <span id="lines">0</span>
+        <span id="score">0</span> pts
     </div>
 
-    <canvas id="next"></canvas>
-
-    <div class="touch-controls">
+    <div class="controls">
         <div class="btn" id="left">←</div>
         <div class="btn" id="rotate">⟳</div>
         <div class="btn" id="right">→</div>
-        <div class="btn" id="soft">↓</div>
-        <div class="btn" id="hard">⤓</div>
+        <div class="btn" id="down">↓</div>
+        <div class="btn" id="drop">⤓</div>
         <div class="btn" id="pause">⏸</div>
     </div>
 </div>
 
 <script>
 /* -------------------------
-   BASIC TETRIS ENGINE
+   MOBILE TETRIS ENGINE
 --------------------------*/
 
-const board = document.getElementById("board");
-const ctx = board.getContext("2d");
-ctx.scale(24, 24);
-
-const nextCanvas = document.getElementById("next");
-const nextCtx = nextCanvas.getContext("2d");
-nextCtx.scale(20, 20);
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
+ctx.scale(20, 20);
 
 const overlay = document.getElementById("overlay");
+const scoreEl = document.getElementById("score");
 
 let running = false;
 let paused = false;
-
-const scoreEl = document.getElementById("score");
-const linesEl = document.getElementById("lines");
 
 const COLS = 10;
 const ROWS = 20;
 
 const COLORS = {
-    1: "#00f5ff",
+    1: "#00eaff",
     2: "#ff6bcb",
     3: "#7c3aed",
     4: "#22c55e",
@@ -156,9 +144,7 @@ const arena = createMatrix(COLS, ROWS);
 const player = {
     pos: {x: 0, y: 0},
     matrix: null,
-    next: null,
-    score: 0,
-    lines: 0
+    score: 0
 };
 
 function collide(arena, player) {
@@ -196,10 +182,7 @@ function playerRotate() {
 }
 
 function playerReset() {
-    if (!player.next) player.next = createPiece(PIECES[Math.random() * 7 | 0]);
-    player.matrix = player.next;
-    player.next = createPiece(PIECES[Math.random() * 7 | 0]);
-
+    player.matrix = createPiece(PIECES[Math.random() * 7 | 0]);
     player.pos.y = 0;
     player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
 
@@ -207,26 +190,12 @@ function playerReset() {
         running = false;
         overlay.style.display = "block";
         overlay.textContent = "Game Over — Tap to Restart";
-        arena.forEach(row => row.fill(0));
+        arena.forEach(r => r.fill(0));
     }
-
-    drawNext();
-}
-
-function drawNext() {
-    nextCtx.clearRect(0,0,6,6);
-    player.next.forEach((row,y)=>{
-        row.forEach((v,x)=>{
-            if (v !== 0) {
-                nextCtx.fillStyle = COLORS[v];
-                nextCtx.fillRect(x+1, y+1, 1, 1);
-            }
-        });
-    });
 }
 
 function draw() {
-    ctx.fillStyle = "#050816";
+    ctx.fillStyle = "#0a0f1f";
     ctx.fillRect(0,0,COLS,ROWS);
 
     arena.forEach((row,y)=>{
@@ -249,7 +218,7 @@ function draw() {
 }
 
 let dropCounter = 0;
-let dropInterval = 900;
+let dropInterval = 700;
 let lastTime = 0;
 
 function update(time = 0) {
@@ -275,53 +244,57 @@ function update(time = 0) {
 }
 
 function sweep() {
-    outer: for (let y = arena.length - 1; y >= 0; y--) {
-        for (let x = 0; x < arena[y].length; x++) {
-            if (arena[y][x] === 0) continue outer;
+    for (let y = arena.length - 1; y >= 0; y--) {
+        if (arena[y].every(v => v !== 0)) {
+            arena.splice(y,1);
+            arena.unshift(new Array(COLS).fill(0));
+            player.score += 100;
         }
-        arena.splice(y,1);
-        arena.unshift(new Array(COLS).fill(0));
-        player.score += 100;
-        player.lines++;
     }
     scoreEl.textContent = player.score;
-    linesEl.textContent = player.lines;
 }
-
-/* -------------------------
-   START GAME
---------------------------*/
 
 function startGame() {
     running = true;
     paused = false;
     overlay.style.display = "none";
     player.score = 0;
-    player.lines = 0;
     arena.forEach(r => r.fill(0));
     playerReset();
     update();
 }
 
 /* -------------------------
-   TOUCH CONTROLS
+   TOUCH BUTTONS
 --------------------------*/
 
-document.getElementById("left").onclick = () => player.pos.x-- && collide(arena,player) && player.pos.x++;
-document.getElementById("right").onclick = () => player.pos.x++ && collide(arena,player) && player.pos.x--;
+document.getElementById("left").onclick = () => {
+    player.pos.x--;
+    if (collide(arena, player)) player.pos.x++;
+};
+
+document.getElementById("right").onclick = () => {
+    player.pos.x++;
+    if (collide(arena, player)) player.pos.x--;
+};
+
 document.getElementById("rotate").onclick = () => playerRotate();
-document.getElementById("soft").onclick = () => player.pos.y++;
-document.getElementById("hard").onclick = () => { while (!collide(arena,player)) player.pos.y++; player.pos.y--; merge(arena,player); sweep(); playerReset(); };
+
+document.getElementById("down").onclick = () => player.pos.y++;
+
+document.getElementById("drop").onclick = () => {
+    while (!collide(arena, player)) player.pos.y++;
+    player.pos.y--;
+    merge(arena, player);
+    sweep();
+    playerReset();
+};
+
 document.getElementById("pause").onclick = () => paused = !paused;
 
 /* Tap to start */
-board.addEventListener("touchend", () => {
+canvas.addEventListener("touchend", () => {
     if (!running) startGame();
-});
-
-/* Desktop start */
-document.addEventListener("keydown", e => {
-    if (!running && e.key === "Enter") startGame();
 });
 </script>
 

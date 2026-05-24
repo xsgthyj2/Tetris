@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Neon Tetris</title>
+  <title>Neon Tetris Mobile</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
       --bg: #050816;
@@ -27,6 +28,7 @@
       color: #f8f9ff;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
+      padding: 24px;
     }
 
     .glow-orbit {
@@ -69,6 +71,8 @@
         0 0 0 1px rgba(255,255,255,0.04),
         0 24px 60px rgba(0,0,0,0.9);
       backdrop-filter: blur(18px);
+      max-width: 960px;
+      width: 100%;
     }
 
     .frame::before {
@@ -93,6 +97,7 @@
       padding: 16px;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
       position: relative;
+      flex: 0 0 auto;
     }
 
     .left-panel::before {
@@ -114,13 +119,49 @@
       box-shadow:
         0 0 0 1px rgba(255,255,255,0.04),
         0 18px 40px rgba(0,0,0,0.9);
+      width: 240px;
+      height: 480px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .overlay-message {
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.92);
+      border: 1px solid rgba(148,163,184,0.7);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.9);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(10px);
+    }
+
+    .overlay-message span {
+      color: #a5b4fc;
+    }
+
+    .hidden {
+      display: none;
     }
 
     .right-panel {
-      width: 220px;
+      width: 260px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      flex: 1 1 auto;
     }
 
     .title {
@@ -226,6 +267,8 @@
       background: radial-gradient(circle at top, #11172f, #050816 80%);
       border-radius: 10px;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
+      width: 120px;
+      height: 120px;
     }
 
     .controls {
@@ -311,48 +354,52 @@
       box-shadow: 0 0 10px #f97316;
     }
 
-    .overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-    }
-
-    .overlay-message {
-      padding: 12px 18px;
-      border-radius: 999px;
-      background: rgba(15,23,42,0.92);
-      border: 1px solid rgba(148,163,184,0.7);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.9);
-      font-size: 12px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: #e5e7eb;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      backdrop-filter: blur(10px);
-    }
-
-    .overlay-message span {
-      color: #a5b4fc;
-    }
-
-    .hidden {
+    /* Touch controls (mobile) */
+    .touch-controls {
       display: none;
+      margin-top: 12px;
+    }
+
+    .touch-btn {
+      padding: 14px 0;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      font-size: 16px;
+      text-align: center;
+      user-select: none;
+    }
+
+    .touch-btn:active {
+      background: rgba(255,255,255,0.18);
     }
 
     @media (max-width: 900px) {
       body {
-        padding: 16px;
+        padding: 10px;
       }
+
       .frame {
         flex-direction: column;
+        width: 100%;
+        max-width: 480px;
+        padding: 16px;
       }
+
+      canvas#board {
+        width: 100% !important;
+        height: auto !important;
+      }
+
       .right-panel {
         width: 100%;
+      }
+
+      .touch-controls {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
       }
     }
   </style>
@@ -368,6 +415,15 @@
         <div class="overlay-message" id="overlayMessage">
           <span>Press</span> ENTER <span>to start</span>
         </div>
+      </div>
+
+      <div class="touch-controls">
+        <div class="touch-btn" id="btnLeft">←</div>
+        <div class="touch-btn" id="btnRotate">⟳</div>
+        <div class="touch-btn" id="btnRight">→</div>
+        <div class="touch-btn" id="btnDrop">↓</div>
+        <div class="touch-btn" id="btnHard">⤓</div>
+        <div class="touch-btn" id="btnPause">⏸</div>
       </div>
     </div>
 
@@ -934,6 +990,57 @@
     startBtn.addEventListener("click", () => {
       startGame();
     });
+
+    /* TOUCH CONTROLS (swipe + tap on board) */
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    boardCanvas.addEventListener("touchstart", (e) => {
+      const t = e.changedTouches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+    });
+
+    boardCanvas.addEventListener("touchend", (e) => {
+      const t = e.changedTouches[0];
+      touchEndX = t.clientX;
+      touchEndY = t.clientY;
+
+      const dx = touchEndX - touchStartX;
+      const dy = touchEndY - touchStartY;
+
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (!running || paused) return;
+
+      if (absX > absY && absX > 20) {
+        if (dx > 0) playerMove(1);
+        else playerMove(-1);
+      } else if (absY > absX && absY > 20) {
+        if (dy > 0) playerDrop();
+        else playerRotate(1);
+      } else {
+        playerHardDrop();
+      }
+    });
+
+    /* TOUCH BUTTONS */
+    const btnLeft = document.getElementById("btnLeft");
+    const btnRight = document.getElementById("btnRight");
+    const btnRotate = document.getElementById("btnRotate");
+    const btnDrop = document.getElementById("btnDrop");
+    const btnHard = document.getElementById("btnHard");
+    const btnPause = document.getElementById("btnPause");
+
+    if (btnLeft) btnLeft.onclick = () => !paused && running && playerMove(-1);
+    if (btnRight) btnRight.onclick = () => !paused && running && playerMove(1);
+    if (btnRotate) btnRotate.onclick = () => !paused && running && playerRotate(1);
+    if (btnDrop) btnDrop.onclick = () => !paused && running && playerDrop();
+    if (btnHard) btnHard.onclick = () => !paused && running && playerHardDrop();
+    if (btnPause) btnPause.onclick = () => togglePause();
 
     showOverlay("Press ENTER to start");
     drawBoard();
